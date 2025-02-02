@@ -169,3 +169,27 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Ignore large dataset files
+dataset/
+*.mp4
+*.avi
+*.mkv
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Ignore model weights and large binary files
+*.h5
+*.pth
+*.pt
+*.tflite
+*.onnx
+*.ckpt
+
+# Ignore logs and temporary files
+logs/
+*.log
+*.tmp
+*.out
