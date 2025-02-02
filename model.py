@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.keras import layers, models
+from tensorflow.keras import layers, models # type: ignore
 
 def build_model(input_shape=(224, 224, 3)):
     model = models.Sequential([
@@ -15,15 +15,13 @@ def build_model(input_shape=(224, 224, 3)):
         layers.Conv2D(128, (3, 3), activation='relu'),
         layers.MaxPooling2D((2, 2)),
 
-        # Flatten the output
         layers.Flatten(),
         layers.Dense(64, activation='relu'),
-        layers.Dense(1, activation='sigmoid')  # Binary classification (FPS optimization or not)
+        layers.Dense(1, activation='sigmoid') 
     ])
 
-    # Compile the model
     model.compile(optimizer='adam',
-                  loss='binary_crossentropy',  # Using binary crossentropy since it's a binary classification
+                  loss='binary_crossentropy',
                   metrics=['accuracy'])
 
     return model

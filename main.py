@@ -1,65 +1,94 @@
 import os
 import cv2
+import pyautogui
+import numpy as np
 import matplotlib.pyplot as plt
-from preprocessing import load_and_preprocess_images  # Import the preprocessing function
-from model import build_model
-from keras.callbacks import EarlyStopping
+from preprocessing import load_and_preprocess_images 
+from model import build_model  
+from tensorflow.keras.callbacks import EarlyStopping  # type: ignore
+from frame_preprocessing import preprocess_frame 
+from model_loading import load_trained_model
 
-# Set dataset path
+# Dataset path
 data_dir = "dataset/"
 
-# Load and show a sample image from the dataset
-def load_and_show_image():
-    image_files = [f for f in os.listdir(data_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+# Screen capture Func
+def capture_screen(region=None):
+    screenshot = pyautogui.screenshot(region=region)
+    
+    screenshot = np.array(screenshot)
+    
+    screenshot = cv2.cvtColor(screenshot, cv2.COLOR_RGB2BGR)
+    
+    return screenshot
 
-    if image_files:
-        img_path = os.path.join(data_dir, image_files[0])  # Load the first image
-        print(f"Loading image: {img_path}")
+# shows the captured frame
+def show_frame(frame):
+    plt.imshow(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    plt.title("Captured Game Frame")
+    plt.axis("off")
+    plt.show(block=False) 
+    plt.pause(0.1)  
+    plt.close() 
 
-        # Ensure OpenCV reads images correctly
-        image = cv2.imread(img_path, cv2.IMREAD_COLOR)
+# Predicts FPS optimization based on the frame
+def predict_fps_optimization(model, frame):
+    
+    frame_preprocessed = preprocess_frame(frame)
+    
+    frame_input = np.expand_dims(frame_preprocessed, axis=0)
 
-        if image is None:
-            print(f"❌ Error: Unable to load image {img_path}. Check the file format and integrity.")
-        else:
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            plt.imshow(image)
-            plt.title("Sample Game Frame")
-            plt.axis("off")
-            plt.show()
+    # Predict FPS optimization requirement
+    prediction = model.predict(frame_input)
+    prediction_value = prediction[0][0] 
+
+    print(f"Prediction value: {prediction_value}")  
+
+    if prediction_value > 0.7: 
+        print("⚠️ FPS optimization required!")
+        return True
     else:
-        print("❌ Error: No valid image files (.png, .jpg, .jpeg) found in dataset/. Please check the folder path.")
+        print("✅ FPS is fine.")
+        return False
+    
+# Function to load, preprocess images, and train model
+def preprocess_and_train_model():
+    model = build_model(input_shape=(224, 224, 3)) 
 
-# Load and preprocess images for model
-def preprocess_for_model():
-    images, labels = load_and_preprocess_images(data_dir)  # Preprocess all images in the dataset
+    model = load_trained_model('fps_optimization_model.h5')
+    
+    region = (0, 0, 1920, 1080) 
+    frames_to_capture = 10  
+    frame_count = 0
+    optimization_needed = False
 
-    print(f"Processed {len(images)} images for model training.")
-    print(f"Sample image shape: {images[0].shape}")  # Check the shape of a sample image
+    for _ in range(50):  
+        frame = capture_screen(region)  
+        frame_count += 1
 
-    return images, labels  # Return images and labels for training
+        processed_frame = preprocess_frame(frame)
 
-# Train the model
-def train_model(images, labels):
-    model = build_model(input_shape=images.shape[1:])  # Model with input shape based on image data
+        prediction = model.predict(np.expand_dims(processed_frame, axis=0))
 
-    # Split the data into training and validation sets (80% train, 20% validation)
-    split = int(0.8 * len(images))
-    X_train, X_val = images[:split], images[split:]
-    y_train, y_val = labels[:split], labels[split:]
+        print(f"FPS Optimization Prediction: {prediction}")
 
-    # Train the model with early stopping
-    early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+        show_frame(frame)
 
-    model.fit(X_train, y_train, epochs=10, batch_size=32, validation_data=(X_val, y_val), callbacks=[early_stopping])
+        if frame_count >= frames_to_capture:
+            prediction_value = prediction[0][0]  
+            print(f"Prediction value: {prediction_value}")
 
-    # Save the trained model
-    model.save('fps_optimization_model.h5')
+            if prediction_value > 0.7:  
+                print("⚠️ FPS optimization required!")
+                optimization_needed = True
+                break  
 
-    print("Model training complete.")
+            frame_count = 0  
 
-# Main function
+    if optimization_needed:
+        print("Capture process stopped after detecting FPS optimization need.")
+    else:
+        print("Capture process completed without detecting FPS optimization need.")
+
 if __name__ == "__main__":
-    load_and_show_image()  # Show sample image
-    images, labels = preprocess_for_model()  # Load and preprocess data
-    train_model(images, labels)  # Train the model
+    preprocess_and_train_model()
